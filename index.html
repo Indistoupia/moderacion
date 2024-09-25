@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subida, Movimiento y Redimensionado de Imágenes</title>
+    <style>
+        body {
+            background-color: green;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        .container {
+            margin-top: 50px;
+        }
+
+        .upload-box {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            display: inline-block;
+        }
+
+        .upload-box input {
+            margin-top: 10px;
+        }
+
+        .image-container {
+            margin-top: 20px;
+            position: relative;
+            width: 80%;
+            aspect-ratio: 16 / 9;
+            background-color: rgba(255, 255, 255, 0);
+            border: 2px solid #fff;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        .image-container img {
+            position: absolute;
+            cursor: grab;
+            max-width: none;
+        }
+
+        .resize-handle {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            bottom: 0;
+            right: 0;
+            background-color: white;
+            cursor: nwse-resize;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sube, Mueve y Redimensiona la Imagen</h1>
+        <div class="upload-box">
+            <form id="imageForm">
+                <input type="file" id="imageInput" accept="image/*" value="Subir"><br><br>
+                <input type="submit" value="Añadir">
+                <input type="submit" value="Eliminar">
+            </form>
+        </div>
+        <div class="image-container" id="imageContainer"></div>
+    </div>
+
+    <script>
+        const imageForm = document.getElementById('imageForm');
+        const imageInput = document.getElementById('imageInput');
+        const imageContainer = document.getElementById('imageContainer');
+        let activeImage = null;
+        let offsetX = 0, offsetY = 0;
+        let isDragging = false;
+        let isResizing = false;
+
+        // Añadir imagen al contenedor
+        imageForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const file = imageInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+
+                reader.onload = function(e) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.style.width = "50%";  // Haz la imagen más grande para permitir el movimiento
+                    img.style.height = "auto";  // Mantén la relación de aspecto
+                    img.draggable = false; // Desactivar la función de arrastre por defecto
+                    img.style.left = "0px"; // Inicializa posición
+                    img.style.top = "0px"; // Inicializa posición
+                    imageContainer.innerHTML = ''; // Limpiar contenedor
+                    imageContainer.appendChild(img);
+
+                    // Crear el handle para redimensionar
+                    const resizeHandle = document.createElement('div');
+                    resizeHandle.classList.add('resize-handle');
+                    imageContainer.appendChild(resizeHandle);
+
+                    // Activar movimiento
+                    activeImage = img;
+
+                    // Manejo del arrastre
+                    img.addEventListener('mousedown', startDrag);
+                    window.addEventListener('mousemove', dragImage);
+                    window.addEventListener('mouseup', stopDrag);
+
+                    // Manejo del redimensionado
+                    resizeHandle.addEventListener('mousedown', startResize);
+                    window.addEventListener('mousemove', resizeImage);
+                    window.addEventListener('mouseup', stopResize);
+                }
+
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Iniciar el arrastre
+        function startDrag(e) {
+            if (!isResizing) {  // Solo arrastrar si no está en proceso de redimensionado
+                isDragging = true;
+                offsetX = e.clientX - activeImage.offsetLeft;
+                offsetY = e.clientY - activeImage.offsetTop;
+                activeImage.style.cursor = 'grabbing';
+            }
+        }
+
+        // Arrastrar la imagen
+        function dragImage(e) {
+            if (!isDragging) return;
+
+            let x = e.clientX - offsetX;
+            let y = e.clientY - offsetY;
+
+            // Limitar el movimiento dentro del contenedor
+            const containerRect = imageContainer.getBoundingClientRect();
+            const imgRect = activeImage.getBoundingClientRect();
+
+            // Asegurarse de que la imagen no se salga completamente del contenedor
+            if (x + imgRect.width > containerRect.width) {
+                x = containerRect.width - imgRect.width;
+            }
+            if (y + imgRect.height > containerRect.height) {
+                y = containerRect.height - imgRect.height;
+            }
+
+            // Permitir mover la imagen completamente dentro del contenedor si es más pequeña
+            if (x < 0) x = Math.min(0, containerRect.width - imgRect.width);
+            if (y < 0) y = Math.min(0, containerRect.height - imgRect.height);
+
+            activeImage.style.left = x + 'px';
+            activeImage.style.top = y + 'px';
+        }
+
+        // Detener el arrastre
+        function stopDrag() {
+            isDragging = false;
+            if (activeImage) {
+                activeImage.style.cursor = 'grab';
+            }
+        }
+
+        // Iniciar el redimensionado
+        function startResize(e) {
+            e.preventDefault();
+            isResizing = true;
+            isDragging = false; // Desactiva el arrastre mientras redimensiona
+            offsetX = e.clientX; // Obtener posición inicial del redimensionado
+            offsetY = e.clientY;
+            offsetXd2 = offsetX/2;
+            offsetYd2 = offsetY/2;
+        }
+
+        // Redimensionar la imagen
+        function resizeImage(e) {
+            if (!isResizing) return;
+
+            const containerRect = imageContainer.getBoundingClientRect();
+            const deltaX = e.clientX - offsetX;
+            const deltaY = e.clientY - offsetY;
+
+            const newWidth = activeImage.offsetWidth + deltaX;
+            const aspectRatio = 16 / 9;
+            const newHeight = newWidth;
+
+            // Limitar el tamaño de la imagen dentro de ciertos rangos
+            if (newWidth > containerRect.width / 9 && newWidth < containerRect.width * 2) {
+                activeImage.style.width = newWidth + 'px';
+                activeImage.style.height = newHeight + 'px';
+
+                offsetX = e.clientX; // Actualizar las posiciones
+                offsetY = e.clientY;
+            }
+            
+        }
+
+        // Detener el redimensionado
+        function stopResize() {
+            isResizing = false;
+        }
+    </script>
+</body>
+</html>
